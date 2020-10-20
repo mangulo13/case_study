@@ -6,6 +6,8 @@ output: github_document
 ```{r setup, include = FALSE}
 library(tidyverse)
 library(p8105.datasets)
+library(leaflet)
+data("nyc_airbnb")
 
 knitr::opts_chunk$set(
   fig.width = 6,
@@ -29,7 +31,89 @@ scale_fill_discrete = scale_fill_viridis_d
 ## Load the dataset
 
 ```{r}
-data(nyc_airbnb) %>% 
+p8105.datasets::nyc_airbnb %>% 
   view
+
+```
+
+## Brainstorm some questions
+
+Can use  slice to look at range of observations
+Or sample_frac or sample_n to do the same 
+
+* What is the relationship between price and rating. How about neighborhood and price. 
+* what is the best Airbnb in staten island for <$100
+* what price range is popular in each borough? Most rented?
+* cheapest room type in each neighborhood?
+* What apartment features are related to price
+* Which hosts have higher ratings?
+
+## Working through some of these questions
+
+```{r}
+nyc_airbnb %>% 
+  janitor::clean_names() %>% 
+  filter(neighbourhood_group == "Staten Island", price < 100) %>% 
+  view
+```
+
+Data cleaning
+```{r}
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(stars = review_scores_location / 2)
+```
+
+```{r}
+nyc_airbnb %>% 
+  count(neighbourhood_group, room_type) %>% 
+  pivot_wider(
+    names_from = room_type,
+    values_from = n
+  )
+```
+
+
+```{r}
+nyc_airbnb %>% 
+  group_by(neighbourhood_group, room_type) %>% 
+  summarize(mean_price = mean(price))
+```
+
+```{r}
+nyc_airbnb %>% 
+  filter(neighbourhood_group == "Manhattan") %>% 
+  count(neighbourhood)
+
+nyc_airbnb %>% 
+  filter(
+    price < 1000,
+    neighbourhood_group == "Manhattan") %>% 
+  mutate(neighbourhood = fct_reorder(neighbourhood, price)) %>% 
+  ggplot(aes(x = neighbourhood, y = price))+
+  geom_boxplot()+
+  coord_flip()
+```
+
+Coord flip flips x and y axis
+
+```{r}
+nyc_airbnb %>% 
+  sample_n(1000) %>% 
+  ggplot(aes(x = lat, y = long, color = price))+
+  geom_point()
+```
+
+## Create a leaflet map
+
+```{r}
+pal <- colorNumeric("viridis", nyc_airbnb %>% pull(stars)) 
+
+nyc_airbnb %>% 
+  sample_n(5000) %>% 
+  leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>%   addCircleMarkers(~lat, ~long, radius = 1, color =~ pal(stars))
+
+
 ```
 
